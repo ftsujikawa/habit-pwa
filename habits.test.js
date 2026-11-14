@@ -201,8 +201,9 @@ test('parseState: 記録の重複を除いて並べ替え、知らない項目�
 test('parseState: 形の正しくないデータは Error を投げる', () => {
   const bad = (obj) => () => parseState(JSON.stringify(obj));
   assert.throws(() => parseState('{oops'), /JSON として/);
-  assert.throws(bad(null), /形式が正しくありません/);
-  assert.throws(bad([]), /形式が正しくありません/);
+  assert.throws(bad(null), /このアプリで書き出したファイルではありません/);
+  assert.throws(bad([]), /このアプリで書き出したファイルではありません/);
+  assert.throws(bad({ items: [] }), /このアプリで書き出したファイルではありません/);
   assert.throws(bad({ version: 2, habits: [] }), /バージョン/);
   assert.throws(bad({ version: 1 }), /habits が配列/);
   assert.throws(bad({ version: 1, habits: [{ id: '', name: 'a', records: [] }] }), /id が正しくありません/);
@@ -236,7 +237,8 @@ test('書き出しファイルの形は sample-backup.json と同じ項目を持
   const sample = JSON.parse(readFileSync(new URL('./sample-backup.json', import.meta.url), 'utf8'));
   const exported = JSON.parse(createExportText(parseState(JSON.stringify(sample)), new Date()));
   assert.deepEqual(Object.keys(exported), Object.keys(sample));
-  assert.deepEqual(exported.habits, sample.habits);
+  // 値だけでなく項目の並び順もサンプルと同じ
+  assert.equal(JSON.stringify(exported.habits), JSON.stringify(sample.habits));
 });
 
 test('exportFileName は日付入りのファイル名を返す', () => {

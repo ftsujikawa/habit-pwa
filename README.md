@@ -73,7 +73,7 @@ python3 -m http.server 8000
    - Source が `sw.js`
    - Status が緑の丸と「activated and is running」
    - 上部の「Offline」「Update on reload」「Bypass for network」のチェックがすべて外れている
-4. 左の **Storage → Cache storage → `habit-tracker-v3`**(番号は `sw.js` の `CACHE_NAME` と同じ)に、次の9件があることを確かめる。
+4. 左の **Storage → Cache storage → `habit-tracker-v4`**(番号は `sw.js` の `CACHE_NAME` と同じ)に、次の9件があることを確かめる。
    `/`、`index.html`、`style.css`、`app.js`、`habits.js`、`manifest.webmanifest`、`icons/` の PNG 3つ
 5. 習慣を1つ追加して、今日をチェックしておく。
 

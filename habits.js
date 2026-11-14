@@ -153,8 +153,8 @@ export function parseState(text) {
   } catch {
     throw new Error('JSON として読み込めません。');
   }
-  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
-    throw new Error('データの形式が正しくありません。');
+  if (data === null || typeof data !== 'object' || Array.isArray(data) || !('version' in data)) {
+    throw new Error('このアプリで書き出したファイルではありません。');
   }
   if (data.version !== STORAGE_VERSION) {
     throw new Error(`対応していないバージョンです: ${data.version}`);
@@ -177,8 +177,10 @@ export function parseState(text) {
     for (const r of h.records) {
       if (!isValidDateKey(r)) throw new Error(`${where}に正しくない日付があります: ${r}`);
     }
-    const habit = { id: h.id, name, records: [...new Set(h.records)].sort() };
+    // 項目の並びは書き出しファイルでもこの順になる(id, name, createdAt, records)
+    const habit = { id: h.id, name };
     if (h.createdAt !== undefined) habit.createdAt = h.createdAt;
+    habit.records = [...new Set(h.records)].sort();
     return habit;
   });
   return { version: STORAGE_VERSION, habits };
