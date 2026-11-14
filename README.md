@@ -62,6 +62,8 @@ GitHub Pages で `main` ブランチのルートから配信している。`main
 | `manifest.webmanifest` / `icons/` | ホーム画面に追加するための設定とアイコン |
 | `tools/make-icons.py` | アイコンを作り直すスクリプト(`python3 tools/make-icons.py`) |
 | `sample-backup.json` | 読み込みを試すための練習用データ |
+| `.claude/skills/run-habit-pwa/` | ブラウザで実際に操作して確かめるスキル(下の「ブラウザで操作して確かめる」) |
+| `CLAUDE.md` | このプロジェクトの決まり |
 
 ## 動かし方
 
@@ -76,6 +78,49 @@ npm start   # python3 -m http.server 8000 と同じ
 ```bash
 npm test    # node --test
 ```
+
+## ブラウザで操作して確かめる(run-habit-pwa スキル)
+
+`.claude/skills/run-habit-pwa/` に、画面を出さないブラウザ(headless Chromium)でアプリを実際に操作するスキルがある。
+Claude Code では「アプリを動かして」「スクリーンショットを撮って」などと頼むか、`/run-habit-pwa` で呼び出せる。
+人が直接コマンドで使うこともできる。
+
+### 準備(最初の1回)
+
+```bash
+bash .claude/skills/run-habit-pwa/setup.sh
+```
+
+Playwright と Chromium を `~/.cache/habit-pwa-driver` と `~/.cache/ms-playwright` に入れる(初回は約15秒)。
+アプリの `package.json` には何も足さないので、「外部のライブラリを使わない」方針はそのまま。
+
+### 使い方
+
+```bash
+# 全シナリオ。このフォルダを空きポートで配信して操作し、終わったら配信も止める
+node .claude/skills/run-habit-pwa/driver.mjs
+
+# シナリオを選ぶ(複数可)
+node .claude/skills/run-habit-pwa/driver.mjs smoke import
+
+# 公開版を操作する
+node .claude/skills/run-habit-pwa/driver.mjs --url https://ftsujikawa.github.io/habit-pwa/ --shots /tmp/habit-pwa-shots-live
+```
+
+| シナリオ | 確かめること |
+|---|---|
+| `smoke` | 習慣の追加、今日のチェック、カレンダーでの過去の日のチェック、前の月への移動、再読み込み後も記録が残ること |
+| `import` | `sample-backup.json` の読み込み(確認ダイアログでキャンセル → OK) |
+| `export` | 書き出したファイルの名前と中身 |
+| `delete` | 習慣の削除(確認ダイアログで OK) |
+| `offline` | Service Worker の準備ができてからサーバーを止め(公開版ではネットワークを遮断し)、再読み込みしても表示とデータが残ること |
+
+- 画面はスマホ幅(390×844)で、日時は 2026-11-14 10:00(日本時間)に固定している。`sample-backup.json` の連続日数が毎回同じになるようにするため。
+- 結果は各チェックごとに `OK` で表示され、最後に「すべて成功」(終了コード 0)か「失敗」(終了コード 1)が出る。
+- スクリーンショットは `/tmp/habit-pwa-shots/` に保存される(`--shots` で変更できる)。
+- 毎回新しいブラウザで操作するので、自分の端末やブラウザに保存した習慣のデータには触れない。
+
+詳しい注意点(Ubuntu 26.04・Node 26 で `npx playwright install` が止まる件など)は `.claude/skills/run-habit-pwa/SKILL.md` にある。
 
 ## 保存形式(version 1)
 
