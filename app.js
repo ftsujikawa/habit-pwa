@@ -2,9 +2,11 @@
 import {
   createEmptyState,
   addHabit,
+  removeHabit,
   toggleRecord,
   isDone,
   currentStreak,
+  addMonths,
   monthCalendar,
   parseState,
   serializeState,
@@ -19,12 +21,27 @@ const els = {
   form: document.getElementById('add-form'),
   name: document.getElementById('habit-name'),
   message: document.getElementById('message'),
+  monthNav: document.getElementById('month-nav'),
+  monthLabel: document.getElementById('month-label'),
+  prevMonth: document.getElementById('prev-month'),
+  nextMonth: document.getElementById('next-month'),
   empty: document.getElementById('empty'),
   list: document.getElementById('habit-list'),
 };
 
 let today = toDateKey(new Date());
+let view = currentMonth(); // カレンダーに表示している年月
 let state = loadState();
+
+function currentMonth() {
+  const [year, month] = today.split('-').map(Number);
+  return { year, month };
+}
+
+function isCurrentMonth() {
+  const now = currentMonth();
+  return view.year === now.year && view.month === now.month;
+}
 
 // ---- 保存(端末の localStorage のみ) ----
 
@@ -85,23 +102,35 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
-function render() {
-  const [y, m, d] = today.split('-').map(Number);
-  const weekday = WEEKDAYS[new Date(y, m - 1, d).getDay()];
-  els.today.textContent = `${m}月${d}日(${weekday})`;
-
-  els.empty.hidden = state.habits.length > 0;
-  els.list.replaceChildren(...state.habits.map((habit) => renderHabit(habit, y, m)));
+function formatDate(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  return `${m}月${d}日(${WEEKDAYS[new Date(y, m - 1, d).getDay()]})`;
 }
 
-function renderHabit(habit, year, month) {
+function render() {
+  els.today.textContent = formatDate(today);
+
+  const hasHabits = state.habits.length > 0;
+  els.empty.hidden = hasHabits;
+  els.monthNav.hidden = !hasHabits;
+  els.monthLabel.textContent = view.year === currentMonth().year
+    ? `${view.month}月`
+    : `${view.year}年${view.month}月`;
+  els.nextMonth.disabled = isCurrentMonth();
+
+  els.list.replaceChildren(...state.habits.map(renderHabit));
+}
+
+function renderHabit(habit) {
   const done = isDone(habit, today);
   const streak = currentStreak(habit, today);
 
   const check = el('button', {
     type: 'button',
     class: 'check',
+    'data-action': 'toggle',
     'data-id': habit.id,
+    'data-date': today,
     'aria-pressed': String(done),
     'aria-label': `${habit.name}を今日${done ? 'の記録から外す' : 'やったことにする'}`,
   }, [el('span', { class: 'check-mark', 'aria-hidden': 'true', text: '✓' }), el('span', { text: done ? 'できた' : '今日' })]);
@@ -117,12 +146,22 @@ function renderHabit(habit, year, month) {
     check,
   ]);
 
-  return el('li', { class: done ? 'card is-done' : 'card' }, [head, renderMonth(habit, year, month)]);
+  const remove = el('button', {
+    type: 'button',
+    class: 'remove',
+    'data-action': 'remove',
+    'data-id': habit.id,
+    'aria-label': `${habit.name}を削除`,
+    text: '削除',
+  });
+
+  return el('li', { class: done ? 'card is-done' : 'card' }, [head, renderMonth(habit), remove]);
 }
 
-function renderMonth(habit, year, month) {
+function renderMonth(habit) {
+  const { year, month } = view;
   const cal = monthCalendar(habit, year, month, today);
-  const grid = el('div', { class: 'cal', role: 'group', 'aria-label': `${month}月の記録` });
+  const grid = el('div', { class: 'cal', role: 'group', 'aria-label': `${habit.name}の${month}月の記録` });
 
   for (const w of WEEKDAYS) grid.append(el('span', { class: 'cal-weekday', 'aria-hidden': 'true', text: w }));
   for (let i = 0; i < cal.leadingBlanks; i += 1) grid.append(el('span', { class: 'cal-blank', 'aria-hidden': 'true' }));
@@ -130,12 +169,22 @@ function renderMonth(habit, year, month) {
     const classes = ['cal-day'];
     if (day.done) classes.push('is-done');
     if (day.isToday) classes.push('is-today');
-    if (day.isFuture) classes.push('is-future');
-    const status = day.isFuture ? '' : day.done ? '記録あり' : '記録なし';
-    grid.append(el('span', { class: classes.join(' ') }, [
-      el('span', { 'aria-hidden': 'true', text: String(day.day) }),
-      el('span', { class: 'visually-hidden', text: `${month}月${day.day}日 ${status}` }),
-    ]));
+    if (day.isFuture) {
+      // まだ来ていない日は押せない
+      classes.push('is-future');
+      grid.append(el('span', { class: classes.join(' '), 'aria-hidden': 'true', text: String(day.day) }));
+      continue;
+    }
+    grid.append(el('button', {
+      type: 'button',
+      class: classes.join(' '),
+      'data-action': 'toggle',
+      'data-id': habit.id,
+      'data-date': day.date,
+      'aria-pressed': String(day.done),
+      'aria-label': `${month}月${day.day}日`,
+      text: String(day.day),
+    }));
   }
 
   return el('div', { class: 'month' }, [
@@ -143,9 +192,15 @@ function renderMonth(habit, year, month) {
       `${month}月の記録 `,
       el('strong', { text: String(cal.doneCount) }),
       ` / ${cal.elapsedDays}日`,
+      el('span', { class: 'month-hint', text: '日付を押すと記録を付け外しできます' }),
     ]),
     grid,
   ]);
+}
+
+/** 再描画でボタンが作り直されるので、押したボタンにフォーカスを戻す。 */
+function restoreFocus(selector) {
+  els.list.querySelector(selector)?.focus();
 }
 
 // ---- 操作 ----
@@ -167,14 +222,50 @@ els.form.addEventListener('submit', (event) => {
 });
 
 els.list.addEventListener('click', (event) => {
-  const button = event.target.closest('button.check');
+  const button = event.target.closest('button[data-action]');
   if (!button) return;
-  const id = button.dataset.id;
-  if (commit(toggleRecord(state, id, today))) {
-    showMessage('');
-    // 再描画でボタンが作り直されるので、フォーカスを戻す
-    els.list.querySelector(`button.check[data-id="${CSS.escape(id)}"]`)?.focus();
+  const { action, id, date } = button.dataset;
+  const habit = state.habits.find((h) => h.id === id);
+  if (!habit) return;
+
+  if (action === 'toggle') {
+    let next;
+    try {
+      next = toggleRecord(state, id, date, { today });
+    } catch (err) {
+      showMessage(err.message, true);
+      return;
+    }
+    if (commit(next)) {
+      showMessage(date === today ? '' : `${formatDate(date)}を${isDone(habit, date) ? '未記録に戻しました' : '記録しました'}。`);
+      const sameKind = button.classList.contains('check') ? '.check' : '.cal-day';
+      restoreFocus(`button${sameKind}[data-id="${CSS.escape(id)}"][data-date="${date}"]`);
+    }
+    return;
   }
+
+  if (action === 'remove') {
+    const count = habit.records.length;
+    const ok = window.confirm(
+      `「${habit.name}」を削除しますか?\nこれまでの記録(${count}日分)も消え、元に戻せません。`,
+    );
+    if (ok && commit(removeHabit(state, id))) {
+      showMessage(`「${habit.name}」を削除しました。`);
+      els.name.focus();
+    }
+  }
+});
+
+els.prevMonth.addEventListener('click', () => {
+  view = addMonths(view.year, view.month, -1);
+  render();
+});
+
+els.nextMonth.addEventListener('click', () => {
+  if (isCurrentMonth()) return;
+  view = addMonths(view.year, view.month, 1);
+  render();
+  if (isCurrentMonth()) els.prevMonth.focus(); // 押したボタンが押せなくなるので移す
 });
 
 function newId() {
@@ -185,10 +276,11 @@ function newId() {
 // 日付が変わったら表示を更新する(開きっぱなしで日をまたいだとき用)
 function refreshDate() {
   const now = toDateKey(new Date());
-  if (now !== today) {
-    today = now;
-    render();
-  }
+  if (now === today) return;
+  const wasCurrent = isCurrentMonth();
+  today = now;
+  if (wasCurrent) view = currentMonth(); // 今月を見ていたら新しい月についていく
+  render();
 }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') refreshDate();

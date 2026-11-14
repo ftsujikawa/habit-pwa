@@ -8,7 +8,9 @@ import {
   createEmptyState,
   normalizeName,
   addHabit,
+  removeHabit,
   toggleRecord,
+  addMonths,
   isDone,
   currentStreak,
   monthCalendar,
@@ -84,6 +86,48 @@ test('toggleRecord は不正な日付や存在しない習慣で Error を投げ
   const state = addHabit(createEmptyState(), '読書', { id: 'a', today: '2026-11-01' });
   assert.throws(() => toggleRecord(state, 'a', '2026-11-31'), /日付の形式/);
   assert.throws(() => toggleRecord(state, 'nope', '2026-11-14'), /見つかりません/);
+});
+
+test('removeHabit は指定した習慣だけを消し、元の state を変えない', () => {
+  let state = addHabit(createEmptyState(), '読書', { id: 'a', today: '2026-11-01' });
+  state = addHabit(state, '散歩', { id: 'b', today: '2026-11-01' });
+  const after = removeHabit(state, 'a');
+  assert.deepEqual(after.habits.map((h) => h.id), ['b']);
+  assert.equal(state.habits.length, 2);
+  assert.throws(() => removeHabit(after, 'a'), /見つかりません/);
+});
+
+test('toggleRecord は過去の日を切り替えられ、today より先の日は拒む', () => {
+  let state = addHabit(createEmptyState(), '読書', { id: 'a', today: '2026-11-01' });
+  state = toggleRecord(state, 'a', '2026-10-31', { today: '2026-11-14' });
+  state = toggleRecord(state, 'a', '2026-11-14', { today: '2026-11-14' });
+  assert.deepEqual(state.habits[0].records, ['2026-10-31', '2026-11-14']);
+  assert.throws(() => toggleRecord(state, 'a', '2026-11-15', { today: '2026-11-14' }), /まだ来ていない/);
+});
+
+test('過去の日を埋めると連続日数がつながる', () => {
+  let state = parseState(readFileSync(new URL('./sample-backup.json', import.meta.url), 'utf8'));
+  const id = state.habits[1].id; // 読書: 11/12 だけ記録、11/13 と今日は未記録
+  assert.equal(currentStreak(state.habits[1], '2026-11-14'), 0);
+  state = toggleRecord(state, id, '2026-11-13', { today: '2026-11-14' });
+  assert.equal(currentStreak(state.habits[1], '2026-11-14'), 2);
+  state = toggleRecord(state, id, '2026-11-10', { today: '2026-11-14' });
+  state = toggleRecord(state, id, '2026-11-11', { today: '2026-11-14' });
+  assert.equal(currentStreak(state.habits[1], '2026-11-14'), 11); // 11/3〜11/13
+});
+
+test('addMonths は年をまたげる', () => {
+  assert.deepEqual(addMonths(2026, 11, 1), { year: 2026, month: 12 });
+  assert.deepEqual(addMonths(2026, 12, 1), { year: 2027, month: 1 });
+  assert.deepEqual(addMonths(2026, 1, -1), { year: 2025, month: 12 });
+  assert.deepEqual(addMonths(2026, 11, -23), { year: 2024, month: 12 });
+});
+
+test('monthCalendar: 過去の月はすべての日が経過済み', () => {
+  const cal = monthCalendar(habitWith(['2026-10-31']), 2026, 10, '2026-11-14');
+  assert.equal(cal.elapsedDays, 31);
+  assert.equal(cal.doneCount, 1);
+  assert.equal(cal.days.some((d) => d.isToday || d.isFuture), false);
 });
 
 test('currentStreak: 今日まで続いていれば今日を含めて数える', () => {

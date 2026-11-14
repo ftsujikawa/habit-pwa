@@ -1,6 +1,6 @@
 // オフライン用の Service Worker。アプリの部品を端末にキャッシュし、ネットにつながらなくても開けるようにする。
 // アプリのファイルを変更したら CACHE_NAME の番号を上げること(上げないと古いファイルが出続ける)。
-const CACHE_NAME = 'habit-tracker-v1';
+const CACHE_NAME = 'habit-tracker-v2';
 const ASSETS = [
   './',
   './index.html',

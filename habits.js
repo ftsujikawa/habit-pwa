@@ -67,9 +67,19 @@ export function addHabit(state, name, { id, today }) {
   return { ...state, habits: [...state.habits, habit] };
 }
 
-/** 指定した日の記録をつける/外す(切り替える)。 */
-export function toggleRecord(state, habitId, date) {
+/** 習慣を削除した新しい state を返す。 */
+export function removeHabit(state, habitId) {
+  if (!state.habits.some((h) => h.id === habitId)) throw new Error(`習慣が見つかりません: ${habitId}`);
+  return { ...state, habits: state.habits.filter((h) => h.id !== habitId) };
+}
+
+/**
+ * 指定した日の記録をつける/外す(切り替える)。過去の日も切り替えられる。
+ * options.today を渡すと、それより先の日付は Error にする。
+ */
+export function toggleRecord(state, habitId, date, { today } = {}) {
   if (!isValidDateKey(date)) throw new Error(`日付の形式が正しくありません: ${date}`);
+  if (today !== undefined && date > today) throw new Error('まだ来ていない日は記録できません。');
   const index = state.habits.findIndex((h) => h.id === habitId);
   if (index === -1) throw new Error(`習慣が見つかりません: ${habitId}`);
 
@@ -99,6 +109,12 @@ export function currentStreak(habit, today) {
     day = addDays(day, -1);
   }
   return count;
+}
+
+/** 年月に n か月足す(負なら引く)。month は 1〜12。 */
+export function addMonths(year, month, n) {
+  const index = year * 12 + (month - 1) + n;
+  return { year: Math.floor(index / 12), month: (index % 12) + 1 };
 }
 
 /**
