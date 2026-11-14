@@ -187,3 +187,21 @@ export function parseState(text) {
 export function serializeState(state) {
   return JSON.stringify(state);
 }
+
+/** 書き出しファイルの中身。保存形式に書き出した日時(exportedAt)を足し、人が読めるよう整形する。 */
+export function createExportText(state, now) {
+  const data = { version: STORAGE_VERSION, exportedAt: now.toISOString(), habits: state.habits };
+  return `${JSON.stringify(data, null, 2)}\n`;
+}
+
+export function exportFileName(today) {
+  return `habit-backup-${today}.json`;
+}
+
+/** 確認ダイアログ用に、習慣の数と記録の合計日数を返す。 */
+export function summarizeState(state) {
+  return {
+    habitCount: state.habits.length,
+    recordCount: state.habits.reduce((sum, h) => sum + h.records.length, 0),
+  };
+}

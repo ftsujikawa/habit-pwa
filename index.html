@@ -39,6 +39,16 @@
 
     <p id="empty" class="empty" hidden>まだ習慣がありません。上の欄から追加してください。</p>
     <ul id="habit-list" class="habit-list"></ul>
+
+    <section class="data-section" aria-labelledby="data-heading">
+      <h2 id="data-heading">データの管理</h2>
+      <p class="data-note">データはこの端末の中にだけあります。機種変更や念のための控えに、ファイルへ書き出しておけます。</p>
+      <div class="data-actions">
+        <button type="button" id="export-button">書き出す</button>
+        <button type="button" id="import-button">読み込む</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </div>
+    </section>
   </main>
 
   <noscript><p class="message">このアプリを使うには JavaScript を有効にしてください。</p></noscript>

@@ -10,10 +10,14 @@ import {
   monthCalendar,
   parseState,
   serializeState,
+  createExportText,
+  exportFileName,
+  summarizeState,
   toDateKey,
 } from './habits.js';
 
 const STORAGE_KEY = 'habit-tracker:v1';
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 const els = {
@@ -27,6 +31,9 @@ const els = {
   nextMonth: document.getElementById('next-month'),
   empty: document.getElementById('empty'),
   list: document.getElementById('habit-list'),
+  exportButton: document.getElementById('export-button'),
+  importButton: document.getElementById('import-button'),
+  importFile: document.getElementById('import-file'),
 };
 
 let today = toDateKey(new Date());
@@ -266,6 +273,62 @@ els.nextMonth.addEventListener('click', () => {
   view = addMonths(view.year, view.month, 1);
   render();
   if (isCurrentMonth()) els.prevMonth.focus(); // 押したボタンが押せなくなるので移す
+});
+
+// ---- 書き出しと読み込み ----
+
+els.exportButton.addEventListener('click', () => {
+  if (state.habits.length === 0) {
+    showMessage('書き出す習慣がまだありません。', true);
+    return;
+  }
+  const blob = new Blob([createExportText(state, new Date())], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = el('a', { href: url, download: exportFileName(today) });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60 * 1000);
+  const { habitCount, recordCount } = summarizeState(state);
+  showMessage(`習慣${habitCount}件・記録${recordCount}日分を「${exportFileName(today)}」に書き出しました。`);
+});
+
+els.importButton.addEventListener('click', () => {
+  els.importFile.value = ''; // 同じファイルを続けて選んでも change が起きるように
+  els.importFile.click();
+});
+
+els.importFile.addEventListener('change', async () => {
+  const file = els.importFile.files?.[0];
+  if (!file) return;
+  if (file.size > MAX_IMPORT_BYTES) {
+    showMessage('ファイルが大きすぎます。このアプリで書き出したファイルを選んでください。', true);
+    return;
+  }
+
+  let imported;
+  try {
+    imported = parseState(await file.text());
+  } catch (err) {
+    showMessage(`読み込めませんでした: ${err.message}`, true);
+    return;
+  }
+
+  const incoming = summarizeState(imported);
+  const current = summarizeState(state);
+  const lines = [`「${file.name}」を読み込みます。`, `ファイルの中身: 習慣${incoming.habitCount}件・記録${incoming.recordCount}日分`];
+  if (current.habitCount > 0) {
+    lines.push(
+      '',
+      `今のデータ(習慣${current.habitCount}件・記録${current.recordCount}日分)はすべて置き換わり、元に戻せません。`,
+      '必要なら、先に「書き出す」で控えを取ってください。',
+    );
+  }
+  if (!window.confirm(lines.join('\n'))) return;
+
+  if (commit(imported)) {
+    showMessage(`習慣${incoming.habitCount}件・記録${incoming.recordCount}日分を読み込みました。`);
+  }
 });
 
 function newId() {

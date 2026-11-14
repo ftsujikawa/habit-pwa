@@ -16,6 +16,9 @@ import {
   monthCalendar,
   parseState,
   serializeState,
+  createExportText,
+  exportFileName,
+  summarizeState,
   MAX_NAME_LENGTH,
 } from './habits.js';
 
@@ -217,4 +220,31 @@ test('serializeState と parseState で元に戻る', () => {
   let state = addHabit(createEmptyState(), '読書', { id: 'a', today: '2026-11-01' });
   state = toggleRecord(state, 'a', '2026-11-14');
   assert.deepEqual(parseState(serializeState(state)), state);
+});
+
+test('createExportText: version と exportedAt を含み、読み込むと元に戻る', () => {
+  let state = addHabit(createEmptyState(), '読書', { id: 'a', today: '2026-11-01' });
+  state = toggleRecord(state, 'a', '2026-11-14');
+  const text = createExportText(state, new Date('2026-11-14T09:30:00Z'));
+  const data = JSON.parse(text);
+  assert.equal(data.version, 1);
+  assert.equal(data.exportedAt, '2026-11-14T09:30:00.000Z');
+  assert.deepEqual(parseState(text), state);
+});
+
+test('書き出しファイルの形は sample-backup.json と同じ項目を持つ', () => {
+  const sample = JSON.parse(readFileSync(new URL('./sample-backup.json', import.meta.url), 'utf8'));
+  const exported = JSON.parse(createExportText(parseState(JSON.stringify(sample)), new Date()));
+  assert.deepEqual(Object.keys(exported), Object.keys(sample));
+  assert.deepEqual(exported.habits, sample.habits);
+});
+
+test('exportFileName は日付入りのファイル名を返す', () => {
+  assert.equal(exportFileName('2026-11-14'), 'habit-backup-2026-11-14.json');
+});
+
+test('summarizeState は習慣の数と記録の合計日数を数える', () => {
+  const state = parseState(readFileSync(new URL('./sample-backup.json', import.meta.url), 'utf8'));
+  assert.deepEqual(summarizeState(state), { habitCount: 3, recordCount: 26 });
+  assert.deepEqual(summarizeState(createEmptyState()), { habitCount: 0, recordCount: 0 });
 });
