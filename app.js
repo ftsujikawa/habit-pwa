@@ -355,7 +355,13 @@ render();
 // ---- オフライン対応とデータの保護 ----
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {
+  // updateViaCache: 'none' … sw.js 自体の更新確認でブラウザの HTTP キャッシュを使わない
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((registration) => {
+    // ホーム画面のアプリは開きっぱなしになりやすいので、前面に戻ったときにも sw.js の更新を確かめる
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') registration.update().catch(() => {});
+    });
+  }).catch(() => {
     /* 登録できない環境(file:// など)でも、アプリ自体は動かす */
   });
 }
